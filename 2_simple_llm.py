@@ -60,5 +60,3 @@ print(f"Question: { final_state['question']}\n")
 print(f"Answer: \n{ final_state['answer']}")
 
 
-from IPython.display import Image
-Image(workflow.get_graph().draw_mermaid_png())
