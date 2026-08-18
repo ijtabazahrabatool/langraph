@@ -1,10 +1,11 @@
 import io
 from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
-from typing import TypedDict, Literal 
+from typing import Annotated, TypedDict, Literal 
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import BaseModel, Field
 from PIL import Image
+import operator
 
 
 
@@ -45,6 +46,9 @@ class TweetState(TypedDict):
     feedback: str
     iteration: int
     max_iterations: int
+    tweet_history: Annotated[list[str], operator.add ]
+    feedback_history: Annotated[list[str], operator.add ] 
+    
 
 #create graph
 graph = StateGraph(TweetState)
@@ -64,15 +68,15 @@ def generate_tweet(state: TweetState):
     -Use Observational humor, irony, sarcasm, or cultural references.
     -Think in meme logic, punchlines, or relatable takes.
     -use simple day-to-day english
-    This is version {state['iteration'] + 1}.
+
 """
     )
     ]
     #send generator_llm
-    response = generator_llm.invoke(messages) 
+    response = generator_llm.invoke(messages).content
 
     #return response
-    return {"tweet": response.content}
+    return {"tweet": response, "tweet_history": [response]}
 
 
 #node 2: evaluate tweet 
@@ -105,7 +109,7 @@ universe" or vague summaries)
 """)
     ]
     response = structured_evaluator_llm.invoke(messages)
-    return {"evaluation": response.evaluation, "feedback": response.feedback}
+    return {"evaluation": response.evaluation, "feedback": response.feedback, "feedback_history": [response.feedback]} 
 
 #node 3 optimize tweet
 def optimize_tweet(state: TweetState):
@@ -122,7 +126,7 @@ Re-write it as a short, viral-worthy tweet. Avoid Q&A style and stay under 280 c
     ]
 
     response = optimizer_llm.invoke(messages).content
-    return {"tweet": response, "iteration": state["iteration"] + 1}
+    return {"tweet": response, "iteration": state["iteration"] + 1 , "tweet_history": [response]}
 
 #check condition
 def route_evaluation(state: TweetState) -> Literal["approved", "needs_improvement"]:
@@ -148,9 +152,14 @@ graph.add_edge("optimize", "evaluate")
 #compile graph
 workflow = graph.compile()
 
-initial_state = {"topic": "The role of AI in average people's lives" , "iteration": 1, "max_iterations": 5}
+initial_state = {"topic": "Edbeg" , "iteration": 1, "max_iterations": 5}
 result = workflow.invoke(initial_state)
 print(result)
+
+
+
+for tweet in result["tweet_history"]:
+    print(tweet)
 
 
 #show graph
