@@ -1,0 +1,1 @@
+chatbot.get_state(config=CONFIG).values['messages']
