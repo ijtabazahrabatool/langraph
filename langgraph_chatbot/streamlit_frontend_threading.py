@@ -1,7 +1,8 @@
 import streamlit as st
-from langgraph_backend import chatbot , llm
-from langchain_core.messages import HumanMessage
+from langgraph_tool_backend import chatbot , llm
+from langchain_core.messages import AIMessage, HumanMessage
 import uuid 
+
 
 #****************************** Utitlity functions ********************************************
 def generate_thread_id():
@@ -13,9 +14,15 @@ def reset_chat():
     st.session_state['thread_id'] = thread_id
     st.session_state['message_history'] = [] 
 
-def generate_thread_title(user_msg) -> str:
+def generate_thread_title(user_msg, thread_id) -> str:
     prompt = f"Summarize this user query into a concise 3-5 word title. Do not use quotes, punctuation, or preamble:\n\n{user_msg}"
-    response = llm.invoke(prompt)
+    response = llm.invoke(
+        prompt,
+        config={
+            'run_name': 'generate_thread_title',
+            'metadata': {'thread_id': str(thread_id)}
+        }
+                          )
     return response.content.strip().replace("\n", " ")
 
 def add_thread(thread_id , first_message: str):
@@ -26,7 +33,7 @@ def add_thread(thread_id , first_message: str):
         st.session_state['chat_threads'].append(
             {
                 'id': thread_id,
-                'title': generate_thread_title(first_message)
+                'title': generate_thread_title(first_message, thread_id)
             }
         )
         return True
@@ -108,14 +115,19 @@ if user_input := st.chat_input("Type here"):
 
     # Simulate an assistant response
     with st.chat_message('assistant'):
-        ai_message = st.write_stream(
-            message_chunk for message_chunk , metadata in chatbot.stream(
+        def ai_only_stream ():
+            for message_chunk , metadata in chatbot.stream(
                   {"messages": [HumanMessage(content=user_input)]},
                     config  = CONFIG,
                     stream_mode= 'messages'
-            )
-        )
+            ):
+                if isinstance(message_chunk, AIMessage):
+                    #yeild only assistant chunks
+                    yield message_chunk.content
+                   
 
+        
+    ai_message = st.write_stream(ai_only_stream()) 
     st.session_state['message_history'].append({'role': 'assistant', 'content': ai_message })
 
     if is_new:

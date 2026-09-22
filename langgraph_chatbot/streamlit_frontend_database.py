@@ -4,6 +4,8 @@ from langchain_core.messages import HumanMessage
 from db_utils import init_db, save_thread, load_threads
 import uuid 
 
+
+
 #****************************** Utitlity functions ********************************************
 init_db()
 
@@ -16,9 +18,15 @@ def reset_chat():
     st.session_state['thread_id'] = str(thread_id)
     st.session_state['message_history'] = [] 
 
-def generate_thread_title(user_msg) -> str:
+def generate_thread_title(user_msg, thread_id) -> str:
     prompt = f"Summarize this user query into a concise 3-5 word title. Do not use quotes, punctuation, or preamble:\n\n{user_msg}"
-    response = llm.invoke(prompt)
+    response = llm.invoke(
+        prompt,
+        config={
+            "run_name": "generate_thread_title",
+            "metadata": {"thread_id": str(thread_id)}
+        }
+        )
     return response.content.strip().replace("\n", " ")
 
 def add_thread(thread_id , first_message: str):
@@ -28,7 +36,7 @@ def add_thread(thread_id , first_message: str):
     if not thread_exists:
 
         # 1. Generate the 3-5 word summary title
-        title = generate_thread_title(first_message)
+        title = generate_thread_title(first_message, thread_id)
 
         # 2. SAVE PERMANENTLY TO SQLITE DATABASE (Here is where it is used!)
         save_thread(thread_id, title)
@@ -36,7 +44,7 @@ def add_thread(thread_id , first_message: str):
         st.session_state['chat_threads'].append(
             {
                 'id': thread_id,
-                'title': generate_thread_title(first_message)
+                'title': title
             }
         )
         return True
@@ -114,7 +122,13 @@ if user_input := st.chat_input("Type here"):
         st.text(user_input)
         
 
-    CONFIG = {'configurable': {'thread_id': st.session_state['thread_id']}}
+    CONFIG = {
+        'configurable': {'thread_id': st.session_state['thread_id']},
+        'metadata': {
+            'thread_id': st.session_state['thread_id'],
+        },
+        'run_name': 'chat_turn',
+              }
 
     # Simulate an assistant response
     with st.chat_message('assistant'):
