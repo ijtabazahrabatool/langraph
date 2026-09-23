@@ -13,12 +13,15 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.tools import tool
 import requests
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import sqlite3
 
 
 load_dotenv() 
 
-os.environ["LANGCHAIN_PROJECT"] = 'chatbot-project' 
+os.environ["LANGCHAIN_PROJECT"] = 'tool-project' 
 
 # define llm
 llm = ChatGoogleGenerativeAI(
@@ -66,8 +69,33 @@ def get_stock_price(symbol: str) -> dict:
     r = requests.get(url)
     return r.json() 
 
+
+@tool
+def get_current_time(timezone_name: str = "UTC") -> dict:
+    """
+    Get the current time, date, and day of the week for a given IANA timezone.
+    Examples of timezone_name: 'America/New_York', 'Asia/Tokyo', 'Europe/London', 'Asia/Karachi', 'UTC'.
+    Defaults to 'UTC' if not specified.
+    """
+    try:
+        #load the timezone and get the current time in that zone
+        tz = ZoneInfo(timezone_name)
+        now = datetime.now(tz)
+
+        return {
+            "timezone": timezone_name,
+            "current_time": now.strftime("%I:%M:%S %p"),
+            "current_date": now.strftime("%Y-%m-%d"),
+            "day_of_week": now.strftime("%A"),
+            "utc_offset": now.strftime("%z")
+        }
+    except Exception as e:
+        return {
+            "error": f"Invalid timezone '{timezone_name}'. Please use a valid IANA timezone like 'America/New_York' or 'Asia/Tokyo'."
+        }
+
 #Make tool list 
-tools = [get_stock_price, search_tool, calculator]
+tools = [get_stock_price, search_tool, calculator, get_current_time]
 
 #Make the LLM tool-aware
 llm_with_tools = llm.bind_tools(tools)
