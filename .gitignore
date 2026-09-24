@@ -2,3 +2,4 @@
 .DS_Store
 myenv/
 test.py
+__pycache__/
